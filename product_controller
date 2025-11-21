@@ -1,0 +1,64 @@
+// lib/controllers/product_controller.dart
+import 'package:get/get.dart';
+import '../models/product.dart';
+import '../services/api_service.dart';
+
+class ProductController extends GetxController {
+  final products = <Product>[].obs;
+  final isLoading = false.obs;
+  final isLoadingMore = false.obs;
+  final errorMessage = RxnString();
+  final total = 0.obs;
+
+  // pagination
+  final int limit = 20;
+  int skip = 0;
+
+  @override
+  void onInit() {
+    super.onInit();
+    fetchInitialProducts();
+  }
+
+  Future<void> fetchInitialProducts() async {
+    isLoading.value = true;
+    errorMessage.value = null;
+    skip = 0;
+    try {
+      final result = await ApiService.fetchProducts(limit: limit, skip: skip);
+      products.assignAll(result['products'] as List<Product>);
+      total.value = result['total'] as int;
+      skip += products.length;
+    } catch (e) {
+      errorMessage.value = e.toString();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchMoreProducts() async {
+    if (products.length >= total.value) return;
+    if (isLoadingMore.value) return;
+
+    isLoadingMore.value = true;
+    try {
+      final result = await ApiService.fetchProducts(limit: limit, skip: skip);
+      final more = result['products'] as List<Product>;
+      products.addAll(more);
+      skip += more.length;
+    } catch (e) {
+      // don't replace existing list — show simple error
+      Get.snackbar('Error', 'Could not load more products');
+    } finally {
+      isLoadingMore.value = false;
+    }
+  }
+
+  Product? findById(int id) {
+    try {
+      return products.firstWhere((p) => p.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+}
